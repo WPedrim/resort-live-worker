@@ -81,8 +81,14 @@ export class RealtimeClient {
 
       const result = await response.json() as T & { errorCode?: string; errorDescription?: string };
       if (!response.ok || result.errorCode) {
-        throw new Error(result.errorDescription ?? `Realtime request failed with status ${response.status}`);
-      }
+  throw new Error(
+    `Realtime API ${response.status}: ${
+      result.errorDescription ??
+      result.errorCode ??
+      JSON.stringify(result)
+    }`,
+  );
+}
       return result;
     } catch (error) {
       if (error instanceof Error && error.name === 'AbortError') {
