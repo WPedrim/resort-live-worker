@@ -194,29 +194,44 @@ export class LiveStreamRoom extends DurableObject<Env> {
       if (oldPublisher) await this.closePublisher(realtime, oldPublisher);
 
       return success({ sessionDescription: response.sessionDescription });
-    } catch {
-      if (oldPublisher) {
-        await Promise.allSettled(retargetedViewers.map((viewer) => this.retargetViewer(
+    } catch (error) {
+  if (oldPublisher) {
+    await Promise.allSettled(
+      retargetedViewers.map((viewer) =>
+        this.retargetViewer(
           realtime,
           viewer,
           oldPublisher.publisher_session_id!,
           oldPublisher.video_track_name!,
           oldPublisher.audio_track_name,
-        )));
-      }
-      if (newSessionId) await realtime.closeTracks(newSessionId, newMids).catch(() => undefined);
-
-      const current = this.getStream();
-      if (current?.status === 'publishing') {
-        this.ctx.storage.sql.exec(
-          `UPDATE stream_state SET status = ?, updated_at = ? WHERE singleton = 1 AND status = 'publishing'`,
-          oldPublisher ? 'live' : 'created',
-          Date.now(),
-        );
-      }
-      return failure(502, 'Media service could not publish the stream');
-    }
+        ),
+      ),
+    );
   }
+
+  if (newSessionId) {
+    await realtime.closeTracks(newSessionId, newMids).catch(() => undefined);
+  }
+
+  const current = this.getStream();
+
+  if (current?.status === 'publishing') {
+    this.ctx.storage.sql.exec(
+      `UPDATE stream_state
+       SET status = ?, updated_at = ?
+       WHERE singleton = 1 AND status = 'publishing'`,
+      oldPublisher ? 'live' : 'created',
+      Date.now(),
+    );
+  }
+
+  return failure(
+    502,
+    error instanceof Error
+      ? error.message
+      : 'Media service could not publish the stream',
+  );
+}
 
   async heartbeatPublisher(publisherToken: string): Promise<RoomResult<{ expiresAt: number }>> {
     const stream = this.getStream();
