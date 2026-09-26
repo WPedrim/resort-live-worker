@@ -389,31 +389,6 @@ export class LiveStreamRoom extends DurableObject<Env> {
   }
 }
 
-  if (newSessionId) {
-    await realtime.closeTracks(newSessionId, newMids).catch(() => undefined);
-  }
-
-  const current = this.getStream();
-
-  if (current?.status === 'publishing') {
-    this.ctx.storage.sql.exec(
-      `UPDATE stream_state
-       SET status = ?, updated_at = ?
-       WHERE singleton = 1 AND status = 'publishing'`,
-      oldPublisher ? 'live' : 'created',
-      Date.now(),
-    );
-  }
-
-  return failure(
-    502,
-    error instanceof Error
-      ? error.message
-      : 'Media service could not publish the stream',
-  );
-}
-  }
-
   async reconnectViewer(viewerId: string, viewerSessionToken: string): Promise<RoomResult<ViewerConnectResult>> {
     const initialViewer = this.getViewer(viewerId);
     const authorized = await this.authorizeViewer(initialViewer, viewerSessionToken);
