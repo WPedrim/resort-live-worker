@@ -367,9 +367,35 @@ export class LiveStreamRoom extends DurableObject<Env> {
       requireSuccessfulTracks(response.tracks, [stream.video_track_name]);
       this.touchViewer(viewerId);
       return success({});
-    } catch {
-      return failure(502, 'Media service could not update viewer quality');
-    }
+    } catch (error) {
+  console.error(JSON.stringify({
+    operation: 'publisher-connect',
+    error: error instanceof Error ? error.message : String(error),
+  }));
+
+  if (newSessionId) {
+    await realtime.closeTracks(newSessionId, newMids).catch(() => undefined);
+  }
+
+  const current = this.getStream();
+
+  if (current?.status === 'publishing') {
+    this.ctx.storage.sql.exec(
+      `UPDATE stream_state
+       SET status = ?, updated_at = ?
+       WHERE singleton = 1 AND status = 'publishing'`,
+      oldPublisher ? 'live' : 'created',
+      Date.now(),
+    );
+  }
+
+  return failure(
+    502,
+    error instanceof Error
+      ? error.message
+      : 'Media service could not publish the stream',
+  );
+}
   }
 
   async reconnectViewer(viewerId: string, viewerSessionToken: string): Promise<RoomResult<ViewerConnectResult>> {
