@@ -195,7 +195,12 @@ export class LiveStreamRoom extends DurableObject<Env> {
 
       return success({ sessionDescription: response.sessionDescription });
     } catch (error) {
-  if (oldPublisher) {
+      console.error(JSON.stringify({
+        operation: 'publisher-connect',
+        error: error instanceof Error ? error.message : String(error),
+      }));
+
+      if (oldPublisher) {
     await Promise.allSettled(
       retargetedViewers.map((viewer) =>
         this.retargetViewer(
@@ -207,30 +212,30 @@ export class LiveStreamRoom extends DurableObject<Env> {
         ),
       ),
     );
-  }
+      }
 
-  if (newSessionId) {
-    await realtime.closeTracks(newSessionId, newMids).catch(() => undefined);
-  }
+      if (newSessionId) {
+        await realtime.closeTracks(newSessionId, newMids).catch(() => undefined);
+      }
 
-  const current = this.getStream();
+      const current = this.getStream();
 
-  if (current?.status === 'publishing') {
-    this.ctx.storage.sql.exec(
-      `UPDATE stream_state
-       SET status = ?, updated_at = ?
-       WHERE singleton = 1 AND status = 'publishing'`,
-      oldPublisher ? 'live' : 'created',
-      Date.now(),
-    );
-  }
+      if (current?.status === 'publishing') {
+        this.ctx.storage.sql.exec(
+          `UPDATE stream_state
+           SET status = ?, updated_at = ?
+           WHERE singleton = 1 AND status = 'publishing'`,
+          oldPublisher ? 'live' : 'created',
+          Date.now(),
+        );
+      }
 
-    return failure(
-    502,
-    error instanceof Error
-      ? error.message
-      : 'Media service could not publish the stream',
-  );
+      return failure(
+        502,
+        error instanceof Error
+          ? error.message
+          : 'Media service could not publish the stream',
+      );
     }
   }
 
