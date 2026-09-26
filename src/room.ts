@@ -225,13 +225,14 @@ export class LiveStreamRoom extends DurableObject<Env> {
     );
   }
 
-  return failure(
+    return failure(
     502,
     error instanceof Error
       ? error.message
       : 'Media service could not publish the stream',
   );
-}
+    }
+  }
 
   async heartbeatPublisher(publisherToken: string): Promise<RoomResult<{ expiresAt: number }>> {
     const stream = this.getStream();
