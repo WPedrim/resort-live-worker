@@ -348,45 +348,45 @@ export class LiveStreamRoom extends DurableObject<Env> {
     return success({ expiresAt: stream.expires_at });
   }
 
-  async setViewerQuality(
-    viewerId: string,
-    viewerSessionToken: string,
-    quality: 'auto' | 'high' | 'medium' | 'low',
-  ): Promise<RoomResult<object>> {
-    const viewer = this.getViewer(viewerId);
-    const authorized = await this.authorizeViewer(viewer, viewerSessionToken);
-    if (!authorized.ok) return authorized;
+ async setViewerQuality(
+  viewerId: string,
+  viewerSessionToken: string,
+  quality: 'auto' | 'high' | 'medium' | 'low',
+): Promise<RoomResult<object>> {
+  const viewer = this.getViewer(viewerId);
+  const authorized = await this.authorizeViewer(viewer, viewerSessionToken);
+  if (!authorized.ok) return authorized;
 
-    const stream = this.getStream();
-    if (!viewer?.sfu_session_id || !viewer.video_mid || !stream?.publisher_session_id || !stream.video_track_name) {
-      return failure(409, 'Viewer video track is not ready');
-    }
+  const stream = this.getStream();
+  if (!viewer?.sfu_session_id || !viewer.video_mid || !stream?.publisher_session_id || !stream.video_track_name) {
+    return failure(409, 'Viewer video track is not ready');
+  }
 
-    const preferredRid = quality === 'medium' ? 'b' : quality === 'low' ? 'c' : 'a';
-    const automatic = quality === 'auto';
+  const preferredRid = quality === 'medium' ? 'b' : quality === 'low' ? 'c' : 'a';
+  const automatic = quality === 'auto';
 
-    try {
-      const response = await new RealtimeClient(this.env).updateTracks(viewer.sfu_session_id, {
-        tracks: [{
-          location: 'remote',
-          sessionId: stream.publisher_session_id,
-          trackName: stream.video_track_name,
-          mid: viewer.video_mid,
-          simulcast: {
-            preferredRid,
-            priorityOrdering: automatic ? 'asciibetical' : 'none',
-            ridNotAvailable: 'asciibetical',
-          },
-        }],
-      });
-      requireSuccessfulTracks(response.tracks, [stream.video_track_name]);
-      this.touchViewer(viewerId);
-      return success({});
-    } catch (error) {
-  console.error(JSON.stringify({
-    operation: 'publisher-connect',
-    error: error instanceof Error ? error.message : String(error),
-  }));
+  try {
+    const response = await new RealtimeClient(this.env).updateTracks(viewer.sfu_session_id, {
+      tracks: [{
+        location: 'remote',
+        sessionId: stream.publisher_session_id,
+        trackName: stream.video_track_name,
+        mid: viewer.video_mid,
+        simulcast: {
+          preferredRid,
+          priorityOrdering: automatic ? 'asciibetical' : 'none',
+          ridNotAvailable: 'asciibetical',
+        },
+      }],
+    });
+
+    requireSuccessfulTracks(response.tracks, [stream.video_track_name]);
+    this.touchViewer(viewerId);
+    return success({});
+  } catch {
+    return failure(502, 'Media service could not update viewer quality');
+  }
+}
 
   if (newSessionId) {
     await realtime.closeTracks(newSessionId, newMids).catch(() => undefined);
